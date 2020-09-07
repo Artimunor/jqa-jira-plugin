@@ -158,6 +158,62 @@ ORDER BY
     `Comment Total` DESC
 ```
 
+### Interteam blocking dependencies
+The use-case here is that as a Team/Project I would like to see which blocking dependencies I have with other Teams/Projects.
+This query has been written from the perspective of a Team/Project, withint the context of a Release/Version.
+```java
+MATCH   
+  (team:Project)-[:CONTAINS]->(teamIssues:Issue)
+WHERE   
+  team.key = '{Your Team/Project Key}'
+
+MATCH   
+  (teamIssues)-[:FIXES|:AFFECTS]-(release:Version)
+WHERE   
+  release.name = '{Your Release/Version Name}'
+
+MATCH   
+  (teamIssues)-[:HAS_LINK|:POINTS_AT]-(link:IssueLink)
+WHERE   
+  link.name = 'Blocks'
+
+MATCH   
+  (link)-[:POINTS_AT|:HAS_LINK]-(externaIssues:Issue)
+WHERE   
+  link.name = 'Blocks'
+
+MATCH   
+  (externaIssues)<-[:CONTAINS]-(externalTeam:Project)
+WHERE   
+  NOT externalTeam = team
+
+MATCH
+  (externaIssues)--(externaIssuesStatus:Status)
+// comment the following WHERE clause in to exclude issues with the externaIssuesStatus done, as they are not blocking anymore
+// commenting it out is required to look at past projects/versions where all issues probably have status 'Done'
+//WHERE 
+//  NOT externaIssuesStatus.name = 'Done' 
+
+OPTIONAL MATCH
+  (externalTeamRelease:Version)--(externaIssues)
+
+SET     
+  teamIssues.description = teamIssues.key
+SET     
+  externaIssues.description = externaIssues.key
+
+RETURN  
+  team, 
+  teamIssues, 
+  release, 
+  link, 
+  externaIssues, 
+  externaIssuesStatus,
+  externalTeam, 
+  externalTeamRelease
+```
+
+
 ## Supported Jira Versions
 
 Unfortunately, we did not find any documentation which Jira versions are supported by the [JIRA REST Java Client](https://mvnrepository.com/artifact/com.atlassian.jira/jira-rest-java-client-api/5.1.1-e0dd194).
